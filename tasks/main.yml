@@ -1,2 +1,70 @@
 ---
+
+- name: Firewall Configuration for microk8s
+  iptables:
+    chain: INPUT
+    jump: ACCEPT
+    protocol: ip
+    source: "{{ item }}"
+  with_items: "{{ microk8s_mgmt_nets }}"
+  when: microk8s_mgmt_nets is defined
+
+- name: Save iptables rules
+  include_tasks: "{{ playbook_dir }}/lib/firewall-save.yml"
+
+- name: Disable active swap
+  command: "swapoff -a"
+  when: ansible_swaptotal_mb > 0
+
+- name: Disable swap (fstab)
+  args:
+    warn: false
+  shell: >
+    sed -i '/^[[:space:]]*[^#].*[[:space:]]\+swap[[:space:]]\+/s/^\(.*\)/#\1/' /etc/fstab
+
+- name: kube directory
+  file:
+    state: directory
+    path: ~/.kube
+    owner: root
+    group: root
+    mode: 0700
+
+- name: Install Microk8s
+  command: "timeout -s INT {{ microk8s_snap_timeout }} snap install --classic --channel {{ microk8s_channel }} microk8s"
+  register: microk8s_install
+  until: "microk8s_install.rc == 0"
+  retries: 5
+  delay: 10
+
+- name: Refresh Microk8s
+  throttle: 1
+  command: "timeout -s INT {{ microk8s_snap_timeout }} snap refresh --classic --channel {{ microk8s_channel }} microk8s"
+  register: microk8s_refresh
+  until: "microk8s_refresh.rc == 0"
+  retries: 5
+  delay: 10
+
+- name: Wait for ready status
+  command: "microk8s status --wait-ready"
+
+- name: node join
+  include_tasks: "node_join.yml"
+  when: "inventory_hostname != microk8s_mgmt_node"
+
+- name: Wait for ready status
+  command: "microk8s status --wait-ready"
+
+- name: Enable services
+  command: "microk8s enable {{ microk8s_enable_services }}"
+  when: "inventory_hostname == microk8s_mgmt_node"
+
+- name: Copy wrapper kubectl
+  copy:
+    src: kubectl
+    dest: /usr/local/bin/kubectl
+    owner: root
+    group: root
+    mode: 0755
+
 ...

@@ -1,0 +1,33 @@
+---
+
+- name: Generate join token
+  throttle: 1
+  shell: "microk8s add-node | grep '^microk8s join' | sed -n '1p'"
+  register: microk8s_join_run
+  environment:
+    http_proxy: ""
+    https_proxy: ""
+  delegate_to: "{{ microk8s_mgmt_node }}"
+  when: inventory_hostname != microk8s_mgmt_node
+
+- debug:
+    msg: "{{ microk8s_join_run }}"
+
+- name: Check node count
+  shell: "microk8s kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{\"\\n\"}{end}' | wc -l"
+  register: node_count
+
+- debug:
+    msg: "Node count: {{ node_count.stdout }}"
+
+- name: Node join
+  throttle: 1
+  when:
+    - inventory_hostname != microk8s_mgmt_node
+    - "node_count.stdout|int == 1"
+  command: "{{ microk8s_join_run.stdout }}"
+  environment:
+    http_proxy: ""
+    https_proxy: ""
+
+...

@@ -1,2 +1,7 @@
 ---
+
+microk8s_channel: "1.20/stable"
+microk8s_snap_timeout: 5m
+microk8s_enable_services: "dns storage dashboard"
+
 ...

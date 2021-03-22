@@ -1,0 +1,2 @@
+#!/bin/bash
+exec microk8s kubectl "$@"
