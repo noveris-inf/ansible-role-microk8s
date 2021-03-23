@@ -26,6 +26,10 @@
     - inventory_hostname != microk8s_mgmt_node
     - "node_count.stdout|int == 1"
   command: "{{ microk8s_join_run.stdout }}"
+  retries: 3
+  delay: 10
+  register: node_join_run
+  until: "node_join_run.rc == 0"
   environment:
     http_proxy: ""
     https_proxy: ""
